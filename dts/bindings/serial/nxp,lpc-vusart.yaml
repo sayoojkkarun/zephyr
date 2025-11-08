@@ -1,0 +1,38 @@
+# Copyright (c) 2025 Aerlync Labs Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+description: NXP LPC vUSART controller
+
+compatible: "nxp,lpc-vusart"
+
+include: [uart-controller.yaml, pinctrl-device.yaml]
+
+properties:
+  reg:
+    required: true
+
+  clocks:
+    required: true
+
+  current-speed:
+    type: int
+    description: Default baudrate in bits per second
+
+  "nxp,swm-tx":
+    type: array
+    description: |
+      Pair of SWM function selector and port pin used for the TX signal.
+      The values should use the macros defined in
+      ``dt-bindings/mux/lpc84x-swm.h``.
+
+  "nxp,swm-rx":
+    type: array
+    description: Pair of SWM function selector and port pin used for the RX signal.
+
+  "nxp,swm-rts":
+    type: array
+    description: Optional SWM assignment for the RTS signal.
+
+  "nxp,swm-cts":
+    type: array
+    description: Optional SWM assignment for the CTS signal.

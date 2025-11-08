@@ -6,6 +6,7 @@
 
 #include <arm/armv6-m.dtsi>
 #include <mem.h>
+#include <zephyr/dt-bindings/clock/lpc84x-clock.h>
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/dt-bindings/pinctrl/lpc84x-pinctrl.h>
 
@@ -80,6 +81,14 @@
 				reg = <1>;
 				status = "disabled";
 			};
+		};
+
+		uart0: uart@40064000 {
+			compatible = "nxp,lpc-vusart";
+			reg = <0x40064000 0x1000>;
+			interrupts = <3 0>;
+			clocks = <&syscon kCLOCK_Uart0>;
+			status = "disabled";
 		};
 	};
 };

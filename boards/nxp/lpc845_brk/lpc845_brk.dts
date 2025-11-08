@@ -7,6 +7,11 @@
 /dts-v1/;
 #include <nxp/nxp_lpc845.dtsi>
 #include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/mux/lpc84x-swm.h>
+#include <zephyr/dt-bindings/pinctrl/lpc84x-pinctrl.h>
+
+#define LPC845_UART0_TX_PINMUX (LPC84X_IOCON_INDEX_PIO0_25 << 20)
+#define LPC845_UART0_RX_PINMUX (LPC84X_IOCON_INDEX_PIO0_24 << 20)
 
 / {
 	model = "NXP LPC845-BRK development board";
@@ -15,6 +20,8 @@
 	chosen {
 		zephyr,sram = &sram0;
 		zephyr,flash = &flash0;
+		zephyr,console = &uart0;
+		zephyr,shell-uart = &uart0;
 	};
 
 	aliases {
@@ -37,4 +44,22 @@
 
 &gpio1 {
 	status = "okay";
+};
+
+&pinctrl {
+	pinmux_uart0_default: pinmux-uart0-default {
+		group0 {
+			pinmux = <LPC845_UART0_TX_PINMUX>, <LPC845_UART0_RX_PINMUX>;
+			bias-pull-up;
+		};
+	};
+};
+
+&uart0 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&pinmux_uart0_default>;
+	pinctrl-names = "default";
+	nxp,swm-tx = <LPC84X_SWM_FUNC_USART0_TXD LPC84X_SWM_PORTPIN(0, 25)>;
+	nxp,swm-rx = <LPC84X_SWM_FUNC_USART0_RXD LPC84X_SWM_PORTPIN(0, 24)>;
 };

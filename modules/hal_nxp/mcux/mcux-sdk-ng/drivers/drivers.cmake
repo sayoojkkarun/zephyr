@@ -31,6 +31,8 @@ endif()
 
 set_variable_ifdef(CONFIG_DMA_MCUX_LPC          CONFIG_MCUX_COMPONENT_driver.lpc_dma)
 set_variable_ifdef(CONFIG_GPIO_MCUX_LPC         CONFIG_MCUX_COMPONENT_driver.lpc_gpio)
+set_variable_ifdef(CONFIG_UART_MCUX_VUSART      CONFIG_MCUX_COMPONENT_driver.lpc_miniusart)
+set_variable_ifdef(CONFIG_SOC_SERIES_LPC84X     CONFIG_MCUX_COMPONENT_driver.swm)
 set_variable_ifdef(CONFIG_NXP_PINT              CONFIG_MCUX_COMPONENT_driver.pint)
 set_variable_ifdef(CONFIG_NXP_INPUTMUX          CONFIG_MCUX_COMPONENT_driver.inputmux)
 set_variable_ifdef(CONFIG_I2C_MCUX_FLEXCOMM     CONFIG_MCUX_COMPONENT_driver.flexcomm)

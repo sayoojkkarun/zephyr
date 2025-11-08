@@ -1,0 +1,11 @@
+config UART_MCUX_VUSART
+	bool "MCUX LPC vUSART driver"
+	depends on DT_HAS_NXP_LPC_VUSART_ENABLED
+	depends on SOC_FAMILY_LPC
+	select SERIAL_HAS_DRIVER
+	select SERIAL_SUPPORT_INTERRUPT
+	select PINCTRL
+	help
+	  Enable support for the NXP LPC vUSART IP block present on LPC8xx
+	  microcontrollers. The driver makes use of the MCUX SDK HAL and
+	  requires valid SWM assignments provided through devicetree.
