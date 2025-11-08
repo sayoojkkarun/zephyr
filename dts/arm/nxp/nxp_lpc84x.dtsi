@@ -1,0 +1,89 @@
+/*
+ * Copyright (c) 2025 Aerlync Labs Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <arm/armv6-m.dtsi>
+#include <mem.h>
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/pinctrl/lpc84x-pinctrl.h>
+
+/ {
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu0: cpu@0 {
+			compatible = "arm,cortex-m0+";
+			reg = <0>;
+		};
+	};
+
+	clock_setup: clock-setup {
+		compatible = "nxp,lpc-clock-init";
+		status = "okay";
+		enable-fro;
+		enable-froout;
+		fro-freq = "30M";
+		enable-sysosc;
+		mainclk-src = "fro";
+	};
+
+	sram0: memory@10000000 {
+		compatible = "mmio-sram";
+		reg = <0x10000000 DT_SIZE_K(8)>;
+	};
+
+	soc {
+		flash0: flash@0 {
+			compatible = "soc-nv-flash";
+			reg = <0 DT_SIZE_K(64)>;
+		};
+
+		syscon: clock-controller@40048000 {
+			compatible = "nxp,lpc-syscon";
+			reg = <0x40048000 0x1000>;
+			#clock-cells = <1>;
+		};
+
+		iocon: iocon@40044000 {
+			compatible = "nxp,lpc-iocon";
+			reg = <0x40044000 0x200>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges = <0x0 0x40044000 0x200>;
+
+			pinctrl: pinctrl {
+				compatible = "nxp,lpc-iocon-pinctrl";
+			};
+		};
+
+		gpio: gpio@a0000000 {
+			compatible = "nxp,lpc-gpio";
+			reg = <0xa0000000 0x2484>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			gpio0: gpio@0 {
+				compatible = "nxp,lpc-gpio-port";
+				gpio-controller;
+				#gpio-cells = <2>;
+				reg = <0>;
+				status = "disabled";
+			};
+
+			gpio1: gpio@1 {
+				compatible = "nxp,lpc-gpio-port";
+				gpio-controller;
+				#gpio-cells = <2>;
+				reg = <1>;
+				status = "disabled";
+			};
+		};
+	};
+};
+
+&nvic {
+	arm,num-irq-priority-bits = <2>;
+};
