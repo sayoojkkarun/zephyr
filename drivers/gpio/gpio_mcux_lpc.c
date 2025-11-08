@@ -20,6 +20,7 @@
 #include <zephyr/pm/device.h>
 #include <zephyr/drivers/pinctrl.h>
 #include <zephyr/irq.h>
+#include <zephyr/sys/util.h>
 #include <soc.h>
 #include <fsl_common.h>
 #include <zephyr/drivers/gpio/gpio_utils.h>
@@ -31,12 +32,54 @@
 #ifdef MCI_IO_MUX
 #include <zephyr/drivers/pinctrl.h>
 #endif
+#ifdef IOCON
+#include <fsl_iocon.h>
+#endif
 
 /* Interrupt sources, matching int-source enum in DTS binding definition */
 #define INT_SOURCE_PINT 0
 #define INT_SOURCE_INTA 1
 #define INT_SOURCE_INTB 2
 #define INT_SOURCE_NONE 3
+
+#if defined(CONFIG_SOC_SERIES_LPC84X)
+#ifndef IOCON_PIO_DIGIMODE_MASK
+#define IOCON_PIO_DIGIMODE_MASK 0U
+#endif
+#ifndef IOCON_PIO_DIGIMODE
+#define IOCON_PIO_DIGIMODE(x) 0U
+#endif
+#ifndef IOCON_PIO_FUNC_MASK
+#define IOCON_PIO_FUNC_MASK 0U
+#endif
+#define IOCON_PIO_MODE_PULLUP   IOCON_PIO_MODE(0x2U)
+#define IOCON_PIO_MODE_PULLDOWN IOCON_PIO_MODE(0x1U)
+
+static const uint8_t lpc84x_iocon_index[2][32] = {
+	{
+		17U, 11U,  6U,  5U,  4U,  3U, 16U, 15U,
+		14U, 13U,  8U,  7U,  2U,  1U, 18U, 10U,
+		 9U,  0U, 30U, 29U, 28U, 27U, 26U, 25U,
+		24U, 23U, 22U, 21U, 20U, 50U, 51U, 35U,
+	},
+	{
+		36U, 37U, 38U, 41U, 42U, 43U, 46U, 49U,
+		31U, 32U, 55U, 54U, 33U, 34U, 39U, 40U,
+		44U, 45U, 47U, 48U, 52U, 53U, 0xFFU, 0xFFU,
+		0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU,
+	},
+};
+
+static inline uint8_t lpc84x_get_iocon_index(uint32_t port, uint32_t pin)
+{
+	if ((port >= ARRAY_SIZE(lpc84x_iocon_index)) ||
+	    (pin >= ARRAY_SIZE(lpc84x_iocon_index[0]))) {
+		return 0xFFU;
+	}
+
+	return lpc84x_iocon_index[port][pin];
+}
+#endif /* CONFIG_SOC_SERIES_LPC84X */
 
 struct gpio_mcux_lpc_config {
 	/* gpio_driver_config needs to be first */
@@ -97,7 +140,17 @@ static int gpio_mcux_lpc_configure(const struct device *dev, gpio_pin_t pin,
 	IOCON_Type *pinmux_base;
 
 	pinmux_base = config->pinmux_base;
+#if defined(CONFIG_SOC_SERIES_LPC84X)
+	uint8_t iocon_index = lpc84x_get_iocon_index(port, pin);
+
+	if (iocon_index == 0xFFU) {
+		return -EINVAL;
+	}
+
+	pinconfig = &pinmux_base->PIO[iocon_index];
+#else
 	pinconfig = (volatile uint32_t *)&(pinmux_base->PIO[port][pin]);
+#endif
 
 	if ((flags & GPIO_SINGLE_ENDED) != 0) {
 		/* Set ODE bit. */
