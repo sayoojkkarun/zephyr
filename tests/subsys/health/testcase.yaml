@@ -1,0 +1,9 @@
+tests:
+  subsys.health:
+    tags:
+      - subsys
+      - health
+    harness: ztest
+    platform_allow:
+      - nrf52840dk/nrf52840
+

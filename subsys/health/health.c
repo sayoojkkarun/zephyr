@@ -373,9 +373,14 @@ static void health_collect_thread_count(void)
 	struct k_thread *thread;
 
 	/* Count all threads */
+#ifdef CONFIG_THREAD_MONITOR
 	STRUCT_SECTION_FOREACH(k_thread, thread) {
 		count++;
 	}
+#else
+	/* Fallback: use a simple count if thread monitor not available */
+	count = 1; /* At least main thread */
+#endif
 
 	builtin_metrics[HEALTH_IDX_THREAD_COUNT].value = count;
 	builtin_metrics[HEALTH_IDX_THREAD_COUNT].timestamp = k_uptime_ticks();
