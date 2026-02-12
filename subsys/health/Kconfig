@@ -1,0 +1,135 @@
+# Health Monitor Subsystem Configuration
+
+# Copyright (c) 2026 Aerlync Labs Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+menuconfig HEALTH_MONITOR
+	bool "Enable Health Monitor subsystem"
+	depends on STATS || THREAD_ANALYZER
+	help
+	  Enable the system health monitoring subsystem that provides
+	  continuous monitoring of CPU usage, memory usage, stack usage,
+	  and thread states.
+
+if HEALTH_MONITOR
+
+config HEALTH_MONITOR_UPDATE_INTERVAL_MS
+	int "Health monitor update interval (ms)"
+	default 1000
+	range 100 60000
+	help
+	  Interval at which health metrics are collected and updated.
+
+config HEALTH_MONITOR_CPU
+	bool "Enable CPU usage monitoring"
+	default y
+	depends on STATS
+	help
+	  Enable monitoring of CPU usage percentage.
+
+config HEALTH_MONITOR_MEMORY
+	bool "Enable memory usage monitoring"
+	default y
+	help
+	  Enable monitoring of memory usage (heap).
+
+config HEALTH_MONITOR_STACK
+	bool "Enable stack usage monitoring"
+	default y
+	depends on THREAD_ANALYZER
+	help
+	  Enable monitoring of thread stack usage.
+
+config HEALTH_MONITOR_THREADS
+	bool "Enable thread state monitoring"
+	default y
+	help
+	  Enable monitoring of thread count and states.
+
+config HEALTH_MONITOR_CUSTOM_METRICS
+	bool "Enable user-defined custom metrics"
+	default y
+	help
+	  Allow applications to register custom health metrics via
+	  health_register_custom_metric() API.
+
+config HEALTH_MONITOR_MAX_CUSTOM_METRICS
+	int "Maximum number of custom metrics"
+	default 8
+	depends on HEALTH_MONITOR_CUSTOM_METRICS
+	range 1 32
+	help
+	  Maximum number of user-defined custom metrics that can be
+	  registered simultaneously.
+
+config HEALTH_MONITOR_HISTORY
+	bool "Enable metric history tracking"
+	default n
+	help
+	  Maintain a history of metric values for trend analysis.
+	  Increases memory usage.
+
+config HEALTH_MONITOR_HISTORY_SIZE
+	int "Number of history samples per metric"
+	default 10
+	depends on HEALTH_MONITOR_HISTORY
+	range 5 100
+	help
+	  Number of historical samples to maintain per metric.
+
+config HEALTH_MONITOR_SHELL
+	bool "Enable health monitor shell commands"
+	default y
+	depends on SHELL
+	help
+	  Enable shell commands for querying health status and metrics.
+
+config HEALTH_MONITOR_DEFAULT_THRESHOLDS
+	bool "Use default thresholds"
+	default y
+	help
+	  Use sensible default thresholds for common metrics.
+	  Can be overridden at runtime via API.
+
+config HEALTH_MONITOR_CPU_WARNING_THRESHOLD
+	int "CPU usage warning threshold (%)"
+	default 80
+	depends on HEALTH_MONITOR_CPU && HEALTH_MONITOR_DEFAULT_THRESHOLDS
+	range 0 100
+
+config HEALTH_MONITOR_CPU_CRITICAL_THRESHOLD
+	int "CPU usage critical threshold (%)"
+	default 95
+	depends on HEALTH_MONITOR_CPU && HEALTH_MONITOR_DEFAULT_THRESHOLDS
+	range 0 100
+
+config HEALTH_MONITOR_MEMORY_WARNING_THRESHOLD
+	int "Memory usage warning threshold (%)"
+	default 80
+	depends on HEALTH_MONITOR_MEMORY && HEALTH_MONITOR_DEFAULT_THRESHOLDS
+	range 0 100
+
+config HEALTH_MONITOR_MEMORY_CRITICAL_THRESHOLD
+	int "Memory usage critical threshold (%)"
+	default 95
+	depends on HEALTH_MONITOR_MEMORY && HEALTH_MONITOR_DEFAULT_THRESHOLDS
+	range 0 100
+
+config HEALTH_MONITOR_STACK_WARNING_THRESHOLD
+	int "Stack usage warning threshold (%)"
+	default 80
+	depends on HEALTH_MONITOR_STACK && HEALTH_MONITOR_DEFAULT_THRESHOLDS
+	range 0 100
+
+config HEALTH_MONITOR_STACK_CRITICAL_THRESHOLD
+	int "Stack usage critical threshold (%)"
+	default 95
+	depends on HEALTH_MONITOR_STACK && HEALTH_MONITOR_DEFAULT_THRESHOLDS
+	range 0 100
+
+module = HEALTH_MONITOR
+module-str = Health Monitor
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # HEALTH_MONITOR
+
