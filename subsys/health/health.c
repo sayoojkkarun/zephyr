@@ -122,10 +122,6 @@ static uint32_t current_interval_ms;
 /* Initialization flag */
 static bool health_initialized;
 
-/* Timer control */
-static bool timer_running;
-static uint32_t current_interval_ms;
-
 /* Threshold violation states for debouncing (prevent flooding) */
 #define MAX_VIOLATION_STATES 16
 static struct threshold_violation_state violation_states[MAX_VIOLATION_STATES];
@@ -390,11 +386,13 @@ static void health_collect_thread_count(void)
 
 /**
  * @brief Check thresholds and invoke callbacks
+ *
+ * Must be called with health_lock already held. The key parameter is used
+ * to unlock before calling callbacks and re-lock after.
  */
-static void health_check_thresholds(enum health_metric_type type, uint32_t value)
+static void health_check_thresholds(enum health_metric_type type, uint32_t value,
+				     k_spinlock_key_t *key)
 {
-	k_spinlock_key_t key = k_spin_lock(&health_lock);
-
 	for (size_t i = 0; i < callback_count; i++) {
 		if (callbacks[i].cb == NULL) {
 			continue;
@@ -497,18 +495,18 @@ static void health_check_thresholds(enum health_metric_type type, uint32_t value
 					health_threshold_cb cb = callbacks[i].cb;
 					void *user_data = callbacks[i].user_data;
 
-					k_spin_unlock(&health_lock, key);
+					k_spin_unlock(&health_lock, *key);
 					cb(type, value, status, user_data);
-					key = k_spin_lock(&health_lock);
+					*key = k_spin_lock(&health_lock);
 				}
 			} else {
 				/* No debounce tracking available - call immediately */
 				health_threshold_cb cb = callbacks[i].cb;
 				void *user_data = callbacks[i].user_data;
 
-				k_spin_unlock(&health_lock, key);
+				k_spin_unlock(&health_lock, *key);
 				cb(type, value, status, user_data);
-				key = k_spin_lock(&health_lock);
+				*key = k_spin_lock(&health_lock);
 			}
 		} else if (status == HEALTH_STATUS_OK) {
 			/* Reset active flags when metric returns to normal */
@@ -521,8 +519,6 @@ static void health_check_thresholds(enum health_metric_type type, uint32_t value
 			}
 		}
 	}
-
-	k_spin_unlock(&health_lock, key);
 }
 
 /**
@@ -541,19 +537,19 @@ static void health_collect_metrics_work(struct k_work *work)
 #ifdef CONFIG_HEALTH_MONITOR_CPU
 	health_collect_cpu_usage();
 	health_check_thresholds(HEALTH_METRIC_CPU_USAGE,
-				builtin_metrics[HEALTH_IDX_CPU_USAGE].value);
+				builtin_metrics[HEALTH_IDX_CPU_USAGE].value, &key);
 #endif
 
 #ifdef CONFIG_HEALTH_MONITOR_MEMORY
 	health_collect_memory_usage();
 	health_check_thresholds(HEALTH_METRIC_MEMORY_USAGE,
-				builtin_metrics[HEALTH_IDX_MEMORY_USAGE].value);
+				builtin_metrics[HEALTH_IDX_MEMORY_USAGE].value, &key);
 #endif
 
 #ifdef CONFIG_HEALTH_MONITOR_STACK
 	health_collect_stack_usage();
 	health_check_thresholds(HEALTH_METRIC_STACK_USAGE,
-				builtin_metrics[HEALTH_IDX_STACK_USAGE].value);
+				builtin_metrics[HEALTH_IDX_STACK_USAGE].value, &key);
 #endif
 
 #ifdef CONFIG_HEALTH_MONITOR_THREADS
@@ -574,7 +570,7 @@ static void health_collect_metrics_work(struct k_work *work)
 		/* Update metric value */
 		/* Find metric in storage and update */
 		/* For now, we'll store in a simplified way */
-		health_check_thresholds(custom_metrics[i].metric_id, value);
+		health_check_thresholds(custom_metrics[i].metric_id, value, &key);
 	}
 #endif
 
@@ -597,12 +593,38 @@ static void health_collect_metrics(struct k_timer *timer)
 
 int health_monitor_init(void)
 {
+	k_spinlock_key_t key = k_spin_lock(&health_lock);
+
 	if (health_initialized) {
-		return -EALREADY;
+		/* Already initialized - just restart timer if stopped */
+		if (!timer_running) {
+			k_timer_start(&collection_timer,
+				      K_MSEC(current_interval_ms),
+				      K_MSEC(current_interval_ms));
+			timer_running = true;
+		}
+		/* Reset custom metrics for clean state (useful for tests) */
+#ifdef CONFIG_HEALTH_MONITOR_CUSTOM_METRICS
+		next_custom_id = HEALTH_METRIC_CUSTOM_START;
+		memset(custom_metrics, 0, sizeof(custom_metrics));
+#endif
+		k_spin_unlock(&health_lock, key);
+		return 0; /* Return success for idempotent init */
 	}
+
+	/* Mark as initialized early to prevent concurrent initialization */
+	health_initialized = true;
+
+	k_spin_unlock(&health_lock, key);
 
 	/* Initialize built-in metrics */
 	health_init_builtin_metrics();
+
+#ifdef CONFIG_HEALTH_MONITOR_CUSTOM_METRICS
+	/* Reset custom metric ID counter and clear custom metrics */
+	next_custom_id = HEALTH_METRIC_CUSTOM_START;
+	memset(custom_metrics, 0, sizeof(custom_metrics));
+#endif
 
 	/* Initialize work queue for metric collection */
 	k_work_init_delayable(&collection_work, health_collect_metrics_work);
@@ -613,13 +635,16 @@ int health_monitor_init(void)
 	/* Set initial interval */
 	current_interval_ms = CONFIG_HEALTH_MONITOR_UPDATE_INTERVAL_MS;
 
+	key = k_spin_lock(&health_lock);
+
 	/* Start periodic collection */
 	k_timer_start(&collection_timer,
 		      K_MSEC(current_interval_ms),
 		      K_MSEC(current_interval_ms));
 
 	timer_running = true;
-	health_initialized = true;
+
+	k_spin_unlock(&health_lock, key);
 
 	LOG_INF("Health monitor initialized");
 
@@ -861,6 +886,10 @@ int health_register_custom_metric(const char *name,
 				   uint32_t critical_threshold,
 				   void *user_data)
 {
+	if (!health_initialized) {
+		return -ENOTSUP;
+	}
+
 	if (name == NULL || collect_fn == NULL) {
 		return -EINVAL;
 	}
@@ -1046,11 +1075,12 @@ int health_monitor_start(void)
 
 int health_monitor_stop(void)
 {
+	k_spinlock_key_t key = k_spin_lock(&health_lock);
+
 	if (!health_initialized) {
+		k_spin_unlock(&health_lock, key);
 		return -ENOTSUP;
 	}
-
-	k_spinlock_key_t key = k_spin_lock(&health_lock);
 
 	if (timer_running) {
 		k_timer_stop(&collection_timer);
@@ -1058,6 +1088,7 @@ int health_monitor_stop(void)
 		timer_running = false;
 	}
 
+	/* Don't reset health_initialized - allow start/stop without re-init */
 	k_spin_unlock(&health_lock, key);
 	return 0;
 }

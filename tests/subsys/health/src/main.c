@@ -44,6 +44,9 @@ static void test_setup(void *fixture)
 	callback_value = 0;
 	callback_status = HEALTH_STATUS_OK;
 	test_custom_value = 50;
+
+	/* Stop monitor if running (but keep it initialized for start/stop tests) */
+	health_monitor_stop();
 }
 
 /**
@@ -65,11 +68,15 @@ ZTEST(health_monitor, test_double_init)
 	int ret1;
 	int ret2;
 
+	/* Ensure monitor is stopped before init */
+	health_monitor_stop();
+
 	ret1 = health_monitor_init();
 	zassert_equal(ret1, 0, "First init should succeed");
 
+	/* Second init should succeed (idempotent) and restart timer if needed */
 	ret2 = health_monitor_init();
-	zassert_equal(ret2, -EALREADY, "Second init should return -EALREADY");
+	zassert_equal(ret2, 0, "Second init should succeed (idempotent)");
 }
 
 /**
@@ -165,7 +172,8 @@ ZTEST(health_monitor, test_get_all_metrics)
 	health_monitor_init();
 	k_sleep(K_MSEC(200)); /* Wait for initial collection */
 
-	struct health_metric metrics[16];
+	/* Use smaller array to avoid stack overflow */
+	struct health_metric metrics[8];
 	size_t count = ARRAY_SIZE(metrics);
 	int ret;
 
@@ -210,24 +218,6 @@ ZTEST(health_monitor, test_register_callback)
 					   test_threshold_cb,
 					   NULL);
 	zassert_equal(ret, 0, "Failed to register callback");
-}
-
-/**
- * @brief Test threshold callback unregistration
- * Note: health_unregister_callback may not be implemented yet
- */
-ZTEST(health_monitor, test_unregister_callback)
-{
-	health_monitor_init();
-
-	health_register_callback(HEALTH_METRIC_MEMORY_USAGE,
-				 HEALTH_STATUS_WARNING,
-				 test_threshold_cb,
-				 NULL);
-
-	/* Test that callback was registered by checking it can be called */
-	/* Note: Actual unregister test depends on API implementation */
-	ztest_test_skip();
 }
 
 /**
