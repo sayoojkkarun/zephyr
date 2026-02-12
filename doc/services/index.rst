@@ -16,6 +16,7 @@ OS Services
    device_mgmt/index
    dsp/index.rst
    formatted_output.rst
+   health/index.rst
    input/index.rst
    instrumentation/index.rst
    ipc/index.rst

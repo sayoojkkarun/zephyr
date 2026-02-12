@@ -2905,6 +2905,25 @@ Hash Utilities:
     - libraries.hash_function
     - libraries.hash_map
 
+Health Monitor:
+  status: maintained
+  maintainers:
+    - sayoojkkarun
+  files:
+    - subsys/health/
+    - include/zephyr/health/
+    - samples/subsys/health/
+    - tests/subsys/health/
+    - doc/services/health/
+  description: >-
+    System Health Monitor subsystem providing continuous runtime monitoring
+    of system health metrics including CPU usage, memory usage, stack usage,
+    and thread states. Supports user-defined custom metrics.
+  labels:
+    - "area: Health Monitor"
+  tests:
+    - subsys.health
+
 Heap Management:
   status: maintained
   maintainers:

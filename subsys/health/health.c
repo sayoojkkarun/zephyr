@@ -646,6 +646,9 @@ int health_monitor_init(void)
 
 	k_spin_unlock(&health_lock, key);
 
+	/* Trigger immediate initial collection so metrics have valid values */
+	k_work_submit(&collection_work.work);
+
 	LOG_INF("Health monitor initialized");
 
 	return 0;
