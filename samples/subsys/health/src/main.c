@@ -21,6 +21,7 @@
 #include <zephyr/health/health.h>
 #include <zephyr/sys/printk.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* Simulated battery level data */
 struct battery_data {
@@ -109,6 +110,15 @@ static void latency_warning_cb(enum health_metric_type type,
 /* Work item for periodic status printing */
 static struct k_work_delayable status_work;
 
+/* Work item for periodic memory allocation/deallocation */
+static struct k_work_delayable memory_work;
+
+/* Memory allocation tracking */
+#define MAX_ALLOCATIONS 4
+static void *allocated_ptrs[MAX_ALLOCATIONS];
+static size_t allocation_sizes[MAX_ALLOCATIONS] = {512, 1024, 256, 2048};
+static size_t active_allocations = 0;
+
 static void print_health_status(struct k_work *work)
 {
 	ARG_UNUSED(work);
@@ -160,12 +170,44 @@ static void print_health_status(struct k_work *work)
 				}
 			}
 
-			printk("  %s: %u", name, metrics[i].value);
+			/* Determine unit based on metric type */
+			const char *unit = "";
+			switch (metrics[i].type) {
+			case HEALTH_METRIC_CPU_USAGE:
+			case HEALTH_METRIC_MEMORY_USAGE:
+			case HEALTH_METRIC_STACK_USAGE:
+				unit = "%";
+				break;
+			case HEALTH_METRIC_FREE_HEAP:
+			case HEALTH_METRIC_TOTAL_HEAP:
+				unit = " bytes";
+				break;
+			case HEALTH_METRIC_THREAD_COUNT:
+			case HEALTH_METRIC_THREADS_HIGH_STACK:
+				unit = ""; /* No unit for counts */
+				break;
+			default:
+				/* Check for custom metrics */
+				if (metrics[i].type >= HEALTH_METRIC_CUSTOM_START) {
+					if (name != NULL) {
+						if (strstr(name, "Latency") != NULL ||
+						    strstr(name, "latency") != NULL) {
+							unit = " ms";
+						} else if (strstr(name, "Level") != NULL ||
+							   strstr(name, "level") != NULL) {
+							unit = "%";
+						}
+					}
+				}
+				break;
+			}
+
+			printk("  %s: %u%s", name, metrics[i].value, unit);
 
 			if (metrics[i].threshold_warning > 0 ||
 			    metrics[i].threshold_critical > 0) {
-				printk(" (W:%u, C:%u)", metrics[i].threshold_warning,
-				       metrics[i].threshold_critical);
+				printk(" (W:%u%s, C:%u%s)", metrics[i].threshold_warning, unit,
+				       metrics[i].threshold_critical, unit);
 			}
 			printk("\n");
 		}
@@ -176,6 +218,43 @@ static void print_health_status(struct k_work *work)
 
 	/* Schedule next status print */
 	k_work_schedule(&status_work, K_SECONDS(10));
+}
+
+/* Memory allocation/deallocation worker */
+static void memory_worker(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	/* Toggle between allocating and freeing memory */
+	if (active_allocations < MAX_ALLOCATIONS) {
+		/* Allocate memory */
+		size_t idx = active_allocations;
+		void *ptr = k_malloc(allocation_sizes[idx]);
+
+		if (ptr != NULL) {
+			allocated_ptrs[idx] = ptr;
+			active_allocations++;
+			/* Fill with some data to ensure it's actually used */
+			memset(ptr, 0xAA, allocation_sizes[idx]);
+			printk("Allocated %zu bytes (total allocations: %zu)\n",
+			       allocation_sizes[idx], active_allocations);
+		} else {
+			printk("Failed to allocate %zu bytes\n", allocation_sizes[idx]);
+		}
+	} else {
+		/* Free all memory */
+		for (size_t i = 0; i < active_allocations; i++) {
+			if (allocated_ptrs[i] != NULL) {
+				k_free(allocated_ptrs[i]);
+				allocated_ptrs[i] = NULL;
+			}
+		}
+		printk("Freed all allocations (%zu blocks)\n", active_allocations);
+		active_allocations = 0;
+	}
+
+	/* Schedule next memory operation */
+	k_work_schedule(&memory_work, K_SECONDS(15));
 }
 
 int main(void)
@@ -257,6 +336,22 @@ int main(void)
 	/* Start periodic status printing */
 	k_work_init_delayable(&status_work, print_health_status);
 	k_work_schedule(&status_work, K_SECONDS(5));
+
+	/* Start periodic memory allocation/deallocation */
+	k_work_init_delayable(&memory_work, memory_worker);
+	k_work_schedule(&memory_work, K_SECONDS(3));
+
+	/* Initial memory allocation to demonstrate heap usage */
+	printk("\nAllocating initial memory blocks...\n");
+	for (size_t i = 0; i < 2 && i < MAX_ALLOCATIONS; i++) {
+		void *ptr = k_malloc(allocation_sizes[i]);
+		if (ptr != NULL) {
+			allocated_ptrs[i] = ptr;
+			active_allocations++;
+			memset(ptr, 0xAA, allocation_sizes[i]);
+			printk("Allocated %zu bytes\n", allocation_sizes[i]);
+		}
+	}
 
 	/* Main loop - just keep running */
 	while (true) {

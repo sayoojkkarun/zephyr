@@ -99,6 +99,40 @@ static const char *get_metric_name(enum health_metric_type type)
 	}
 }
 
+/* Helper function to get unit string for metric */
+static const char *get_metric_unit(enum health_metric_type type)
+{
+	switch (type) {
+	case HEALTH_METRIC_CPU_USAGE:
+	case HEALTH_METRIC_MEMORY_USAGE:
+	case HEALTH_METRIC_STACK_USAGE:
+		return "%";
+	case HEALTH_METRIC_FREE_HEAP:
+	case HEALTH_METRIC_TOTAL_HEAP:
+		return " bytes";
+	case HEALTH_METRIC_THREAD_COUNT:
+	case HEALTH_METRIC_THREADS_HIGH_STACK:
+		return ""; /* No unit for counts */
+	default:
+		/* Check if it's a custom metric - assume ms for latency-like metrics */
+		if (type >= HEALTH_METRIC_CUSTOM_START) {
+			struct health_metric metric;
+			if (health_get_metric(type, &metric) == 0 && metric.name != NULL) {
+				/* Check metric name for common patterns */
+				if (strstr(metric.name, "Latency") != NULL ||
+				    strstr(metric.name, "latency") != NULL) {
+					return " ms";
+				}
+				if (strstr(metric.name, "Level") != NULL ||
+				    strstr(metric.name, "level") != NULL) {
+					return "%";
+				}
+			}
+		}
+		return "";
+	}
+}
+
 /* Helper function to get status string */
 static const char *get_status_string(enum health_status status)
 {
@@ -139,14 +173,17 @@ static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 			name = get_metric_name(metrics[i].type);
 		}
 
+		const char *unit = get_metric_unit(metrics[i].type);
+
 		if (metrics[i].threshold_warning > 0 || metrics[i].threshold_critical > 0) {
 			shell_fprintf(sh, SHELL_NORMAL,
-				      "  %s: %u (Warning: %u, Critical: %u)\n",
-				      name, metrics[i].value,
-				      metrics[i].threshold_warning,
-				      metrics[i].threshold_critical);
+				      "  %s: %u%s (Warning: %u%s, Critical: %u%s)\n",
+				      name, metrics[i].value, unit,
+				      metrics[i].threshold_warning, unit,
+				      metrics[i].threshold_critical, unit);
 		} else {
-			shell_fprintf(sh, SHELL_NORMAL, "  %s: %u\n", name, metrics[i].value);
+			shell_fprintf(sh, SHELL_NORMAL, "  %s: %u%s\n",
+				      name, metrics[i].value, unit);
 		}
 	}
 
@@ -184,13 +221,16 @@ static int cmd_metric(const struct shell *sh, size_t argc, char **argv)
 		name = get_metric_name(type);
 	}
 
-	shell_fprintf(sh, SHELL_NORMAL, "%s: %u\n", name, metric.value);
+	const char *unit = get_metric_unit(type);
+	shell_fprintf(sh, SHELL_NORMAL, "%s: %u%s\n", name, metric.value, unit);
 
 	if (metric.threshold_warning > 0 || metric.threshold_critical > 0) {
 		shell_fprintf(sh, SHELL_NORMAL,
-			      "  Warning Threshold: %u\n", metric.threshold_warning);
+			      "  Warning Threshold: %u%s\n",
+			      metric.threshold_warning, unit);
 		shell_fprintf(sh, SHELL_NORMAL,
-			      "  Critical Threshold: %u\n", metric.threshold_critical);
+			      "  Critical Threshold: %u%s\n",
+			      metric.threshold_critical, unit);
 	}
 
 	shell_fprintf(sh, SHELL_NORMAL, "  Last Updated: %llu ticks\n",
@@ -295,6 +335,66 @@ static int cmd_threshold(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+static int cmd_start(const struct shell *sh, size_t argc, char **argv)
+{
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	int ret = health_monitor_start();
+	if (ret == 0) {
+		shell_fprintf(sh, SHELL_NORMAL, "Health monitor started\n");
+	} else {
+		shell_fprintf(sh, SHELL_ERROR, "Failed to start: %d\n", ret);
+	}
+	return ret;
+}
+
+static int cmd_stop(const struct shell *sh, size_t argc, char **argv)
+{
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	int ret = health_monitor_stop();
+	if (ret == 0) {
+		shell_fprintf(sh, SHELL_NORMAL, "Health monitor stopped\n");
+	} else {
+		shell_fprintf(sh, SHELL_ERROR, "Failed to stop: %d\n", ret);
+	}
+	return ret;
+}
+
+static int cmd_interval(const struct shell *sh, size_t argc, char **argv)
+{
+	if (argc == 1) {
+		/* Get current interval */
+		uint32_t interval = health_monitor_get_interval();
+		shell_fprintf(sh, SHELL_NORMAL, "Current interval: %u ms\n", interval);
+		return 0;
+	}
+
+	if (argc != 2) {
+		shell_fprintf(sh, SHELL_ERROR, "Usage: health interval [ms]\n");
+		return -EINVAL;
+	}
+
+	char *endptr;
+	unsigned long interval_ms = strtoul(argv[1], &endptr, 0);
+
+	if (*endptr != '\0' || interval_ms < 100 || interval_ms > 60000) {
+		shell_fprintf(sh, SHELL_ERROR,
+			      "Invalid interval. Must be 100-60000 ms\n");
+		return -EINVAL;
+	}
+
+	int ret = health_monitor_set_interval((uint32_t)interval_ms);
+	if (ret == 0) {
+		shell_fprintf(sh, SHELL_NORMAL, "Interval set to %lu ms\n", interval_ms);
+	} else {
+		shell_fprintf(sh, SHELL_ERROR, "Failed to set interval: %d\n", ret);
+	}
+	return ret;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	sub_health,
 	SHELL_CMD(status, NULL,
@@ -311,6 +411,15 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_CMD(threshold, NULL,
 		  SHELL_HELP("Set metric thresholds", "<name|id> <warning> <critical>"),
 		  cmd_threshold),
+	SHELL_CMD(start, NULL,
+		  SHELL_HELP("Start health monitor collection", NULL),
+		  cmd_start),
+	SHELL_CMD(stop, NULL,
+		  SHELL_HELP("Stop health monitor collection", NULL),
+		  cmd_stop),
+	SHELL_CMD(interval, NULL,
+		  SHELL_HELP("Get or set update interval (ms)", "[ms]"),
+		  cmd_interval),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(health, &sub_health, "Health monitor commands", NULL);

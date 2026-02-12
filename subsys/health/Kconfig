@@ -11,14 +11,19 @@ menuconfig HEALTH_MONITOR
 	  continuous monitoring of CPU usage, memory usage, stack usage,
 	  and thread states.
 
+	  The health monitor provides a framework for continuous runtime
+	  monitoring of system health metrics and supports user-defined
+	  custom metrics.
+
 if HEALTH_MONITOR
 
 config HEALTH_MONITOR_UPDATE_INTERVAL_MS
 	int "Health monitor update interval (ms)"
-	default 1000
+	default 60000
 	range 100 60000
 	help
 	  Interval at which health metrics are collected and updated.
+	  Default is 60000ms (60 seconds) to reduce system overhead.
 
 config HEALTH_MONITOR_CPU
 	bool "Enable CPU usage monitoring"
@@ -30,8 +35,10 @@ config HEALTH_MONITOR_CPU
 config HEALTH_MONITOR_MEMORY
 	bool "Enable memory usage monitoring"
 	default y
+	depends on SYS_HEAP_RUNTIME_STATS || K_HEAP_MEM_POOL_SIZE > 0
 	help
 	  Enable monitoring of memory usage (heap).
+	  Requires CONFIG_SYS_HEAP_RUNTIME_STATS for accurate statistics.
 
 config HEALTH_MONITOR_STACK
 	bool "Enable stack usage monitoring"

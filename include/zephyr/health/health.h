@@ -41,11 +41,15 @@ enum health_metric_type {
 	HEALTH_METRIC_CPU_USAGE,
 	/** Memory usage percentage (0-100) */
 	HEALTH_METRIC_MEMORY_USAGE,
-	/** Average stack usage percentage across all threads (0-100) */
+	/** Average stack usage percentage across all threads (0-100).
+	 *  This is a weighted average: (sum of all used stack) / (sum of all stack sizes) * 100
+	 */
 	HEALTH_METRIC_STACK_USAGE,
 	/** Number of active threads */
 	HEALTH_METRIC_THREAD_COUNT,
-	/** Number of threads with high stack usage (>80%) */
+	/** Number of threads with individual stack usage > 80%.
+	 *  This counts threads where (thread_stack_used / thread_stack_size) > 80%
+	 */
 	HEALTH_METRIC_THREADS_HIGH_STACK,
 	/** Free heap memory in bytes */
 	HEALTH_METRIC_FREE_HEAP,
@@ -230,6 +234,43 @@ int health_enable_history(enum health_metric_type type, size_t history_size);
 int health_get_history(enum health_metric_type type,
 		       uint32_t *values,
 		       size_t *count);
+
+/**
+ * @brief Start health monitor collection
+ *
+ * Starts or resumes periodic metric collection.
+ *
+ * @return 0 on success, negative errno on error
+ */
+int health_monitor_start(void);
+
+/**
+ * @brief Stop health monitor collection
+ *
+ * Stops periodic metric collection. Metrics can still be queried
+ * manually, but automatic collection is paused.
+ *
+ * @return 0 on success, negative errno on error
+ */
+int health_monitor_stop(void);
+
+/**
+ * @brief Set health monitor update interval
+ *
+ * Changes the interval at which metrics are collected. Takes effect
+ * on the next collection cycle.
+ *
+ * @param interval_ms Update interval in milliseconds
+ * @return 0 on success, negative errno on error
+ */
+int health_monitor_set_interval(uint32_t interval_ms);
+
+/**
+ * @brief Get health monitor update interval
+ *
+ * @return Current update interval in milliseconds, or 0 if not initialized
+ */
+uint32_t health_monitor_get_interval(void);
 
 /** @} */
 
