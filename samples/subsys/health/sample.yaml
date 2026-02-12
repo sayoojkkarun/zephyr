@@ -1,0 +1,26 @@
+sample:
+  name: Health Monitor Subsystem Sample
+common:
+  harness: console
+  tags:
+    - health
+    - health_monitor
+  harness_config:
+    type: multi_line
+    ordered: false
+    regex:
+      - "Health Monitor Sample Application"
+      - "Health monitor initialized"
+      - "Registered.*metric"
+      - "Available shell commands"
+      - "Overall Status:"
+      - "Metrics:"
+  depends_on:
+    - stats
+    - thread_analyzer
+tests:
+  sample.health:
+    integration_platforms:
+      - qemu_x86
+      - native_posix
+
