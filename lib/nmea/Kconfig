@@ -1,0 +1,55 @@
+# Copyright (c) 2026 Aerlync Labs Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+menuconfig NMEA
+	bool "NMEA 0183 sentence parser library"
+	help
+	  Enable the NMEA 0183 parser library. Provides API for
+	  decoding standard GNSS sentences into structured data types.
+
+if NMEA
+
+config NMEA_SENTENCE_GGA
+	bool "Parse GGA sentences (fix data)"
+	default y
+	help
+	  Enable parsing of GGA sentences containing position fix data
+	  including latitude, longitude, altitude, fix quality, and HDOP.
+
+config NMEA_SENTENCE_RMC
+	bool "Parse RMC sentences (recommended minimum)"
+	default y
+	help
+	  Enable parsing of RMC sentences containing position, speed,
+	  course, and date.
+
+config NMEA_SENTENCE_GSA
+	bool "Parse GSA sentences (DOP and active satellites)"
+	default y
+	help
+	  Enable parsing of GSA sentences containing fix type, DOP values,
+	  and PRNs of satellites used in the position fix.
+
+config NMEA_SENTENCE_GSV
+	bool "Parse GSV sentences (satellites in view)"
+	default y
+	help
+	  Enable parsing of GSV sentences containing satellite PRN,
+	  elevation, azimuth, and signal-to-noise ratio.
+
+config NMEA_SENTENCE_VTG
+	bool "Parse VTG sentences (course and speed)"
+	default n
+	help
+	  Enable parsing of VTG sentences containing course over ground
+	  and speed in both knots and km/h.
+
+config NMEA_SENTENCE_GLL
+	bool "Parse GLL sentences (geographic position)"
+	default n
+	help
+	  Enable parsing of GLL sentences containing latitude, longitude,
+	  and UTC time.
+
+endif # NMEA
