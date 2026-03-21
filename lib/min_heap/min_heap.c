@@ -30,6 +30,10 @@ static void heapify_up(struct min_heap *heap, size_t index)
 			break;
 		}
 		byteswp(curr, par, heap->elem_size);
+		if (heap->on_move != NULL) {
+			heap->on_move(par, parent, heap->move_ctx);
+			heap->on_move(curr, index, heap->move_ctx);
+		}
 		index = parent;
 	}
 }
@@ -74,6 +78,10 @@ static void heapify_down(struct min_heap *heap, size_t index)
 		}
 
 		byteswp(elem_index, elem_smallest, heap->elem_size);
+		if (heap->on_move != NULL) {
+			heap->on_move(elem_index, index, heap->move_ctx);
+			heap->on_move(elem_smallest, smallest, heap->move_ctx);
+		}
 		index = smallest;
 	}
 }
@@ -87,6 +95,17 @@ void min_heap_init(struct min_heap *heap, void *storage, size_t cap,
 	heap->elem_size = elem_size;
 	heap->cmp = cmp;
 	heap->size = 0;
+	heap->on_move = NULL;
+	heap->move_ctx = NULL;
+}
+
+void min_heap_init_ex(struct min_heap *heap, void *storage, size_t cap,
+		size_t elem_size, min_heap_cmp_t cmp,
+		min_heap_move_t on_move, void *move_ctx)
+{
+	min_heap_init(heap, storage, cap, elem_size, cmp);
+	heap->on_move  = on_move;
+	heap->move_ctx = move_ctx;
 }
 
 void *min_heap_peek(const struct min_heap *heap)
@@ -107,6 +126,9 @@ int min_heap_push(struct min_heap *heap, const void *item)
 	void *dest = min_heap_get_element(heap, heap->size);
 
 	memcpy(dest, item, heap->elem_size);
+	if (heap->on_move != NULL) {
+		heap->on_move(dest, heap->size, heap->move_ctx);
+	}
 	heapify_up(heap, heap->size);
 	heap->size++;
 
@@ -127,6 +149,9 @@ bool min_heap_remove(struct min_heap *heap, size_t id, void *out_buf)
 		void *last = min_heap_get_element(heap, heap->size);
 
 		memcpy(removed, last, heap->elem_size);
+		if (heap->on_move != NULL) {
+			heap->on_move(removed, id, heap->move_ctx);
+		}
 		heapify_down(heap, id);
 		heapify_up(heap, id);
 	}

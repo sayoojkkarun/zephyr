@@ -50,6 +50,19 @@ typedef bool (*min_heap_eq_t)(const void *node,
 			       const void *other);
 
 /**
+ * @brief position update callback for min-heap elements.
+ *
+ * Called when an element is placed at a new index in the heap storage,
+ * both on initial insertion and after every swap performed by heapify
+ * functions.
+ *
+ * @param elem Pointer to the element's current storage slot.
+ * @param index Index of the slot where the element now resides.
+ * @param user_data Opaque pointer supplied at heap init.
+ */
+typedef void (*min_heap_move_t)(void *elem, size_t index, void *user_data);
+
+/**
  * @brief min-heap data structure with user-provided comparator.
  */
 struct min_heap {
@@ -63,6 +76,13 @@ struct min_heap {
 	size_t size;
 	/** Comparator function */
 	min_heap_cmp_t cmp;
+	/**
+	 * Optional callback invoked when an element moves to a new slot.
+	 * Set to NULL if position tracking is not required.
+	 */
+	min_heap_move_t on_move;
+	/** Opaque context pointer forwareded to every on_move call. */
+	void *move_ctx;
 };
 
 /**
@@ -80,7 +100,9 @@ struct min_heap {
 				.capacity = (cap),                                                 \
 				.elem_size = (elem_sz),                                            \
 				.size = 0,                                                         \
-				.cmp = (cmp_func)}
+				.cmp = (cmp_func),                                                 \
+				.on_move = NULL,                                                   \
+				.mov_ctx = NULL}
 
 /**
  * @brief Define a statically allocated and aligned min-heap instance.
@@ -98,7 +120,9 @@ struct min_heap {
 			.capacity = (cap), \
 			.elem_size = (elem_sz), \
 			.size = 0, \
-			.cmp = (cmp_func) \
+			.cmp = (cmp_func), \
+			.on_move = NULL, \
+			.move_ctx = NULL \
 	}
 
 /**
@@ -107,6 +131,7 @@ struct min_heap {
  * Sets up the internal structure of a min heap using a user-provided
  * memory block, capacity, and comparator function. This function must
  * be called before using the heap if not statically defined.
+ * The on_move callback is set to NULL, no position tracking.
  *
  * @param heap Pointer to the min-heap structure.
  * @param storage Pointer to memory block for storing elements.
@@ -119,6 +144,26 @@ struct min_heap {
  */
 void min_heap_init(struct min_heap *heap, void *storage, size_t cap,
 		   size_t elem_size, min_heap_cmp_t cmp);
+
+/**
+ * @brief Initialize a min-heap with position update callback.
+ *
+ * Same as min_heap_init() but also registers @p on_move so that
+ * callers embedding a heap index inside their element can keep
+ * track that index in sync as elements are repositioned.
+ *
+ * @param heap Pointer to the min-heap structure.
+ * @param storage Pointer to memory block for storing elements.
+ * @param cap Maximum number of elements the heap can store.
+ * @param elem_size Size in bytes of each element.
+ * @param cmp Comparator function used to order the heap elements.
+ * @param on_move Callback invoked whenever an element moves to a new slot,
+ *		   or NULL if not needed.
+ * @param move_ctx Opaque pointer forwarded to every on_move call.
+ */
+void min_heap_init_ex(struct min_heap *heap, void *storage, size_t cap,
+		size_t elem_size, min_heap_cmp_t cmp,
+		min_heap_move_t on_move, void *move_ctx);
 
 /**
  * @brief Push an element into the min-heap.
