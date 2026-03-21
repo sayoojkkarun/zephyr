@@ -300,6 +300,17 @@ struct _timeout;
 typedef void (*_timeout_func_t)(struct _timeout *t);
 
 struct _timeout {
+#ifdef CONFIG_TIMEOUT_USE_MIN_HEAP
+	/*
+	 * min-heap variant: 8 + 4 + 2 + 2 + 4 = 20 bytes
+	 * dlist variant: node(8) + fn(4) + dticks(8) = 20 bytes.
+	 */
+	int64_t abs_ticks;
+	uint32_t seq;
+	uint16_t heap_idx;
+	uint16_t _pad;
+	_timeout_func_t fn;
+#else
 	sys_dnode_t node;
 	_timeout_func_t fn;
 #ifdef CONFIG_TIMEOUT_64BIT
@@ -308,6 +319,7 @@ struct _timeout {
 #else
 	int32_t dticks;
 #endif
+#endif /* CONFIG_TIMEOUT_USE_MIN_HEAP */
 };
 
 typedef void (*k_thread_timeslice_fn_t)(struct k_thread *thread, void *data);
