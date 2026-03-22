@@ -276,7 +276,7 @@ void sys_clock_announce(int32_t ticks)
 		min_heap_pop(&timeout_heap_inst, &popped);
 		t->heap_idx = TIMEOUT_HEAP_IDX_IDLE;
 
-		key = k_spin_unlock(&timeout_lock, key);
+		k_spin_unlock(&timeout_lock, key);
 		t->fn(t);
 		key = k_spin_lock(&timeout_lock);
 	}
@@ -315,7 +315,7 @@ uint32_t sys_clock_tick_get_32(void)
 #endif
 }
 
-int64_t z_imp_k_uptime_ticks(void)
+int64_t z_impl_k_uptime_ticks(void)
 {
 	return sys_clock_tick_get();
 }
@@ -335,7 +335,7 @@ k_timepoint_t sys_timepoint_calc(k_timeout_t timeout)
 	if (K_TIMEOUT_EQ(timeout, K_FOREVER)) {
 		timepoint.tick = UINT64_MAX;
 	} else if (K_TIMEOUT_EQ(timeout, K_NO_WAIT)) {
-		timeout.tick = 0;
+		timepoint.tick = 0;
 	} else {
 		k_ticks_t dt = timeout.ticks;
 

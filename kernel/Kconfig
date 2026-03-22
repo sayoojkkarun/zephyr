@@ -884,6 +884,7 @@ config TIMEOUT_64BIT
 config TIMEOUT_USE_MIN_HEAP
 	bool "Use min-heap data structure for timeout queue"
 	depends on SYS_CLOCK_EXISTS
+	select MIN_HEAP
 	default n
 	help
 	  When enabled, the kernel timeout subsystem uses a binary min-heap
