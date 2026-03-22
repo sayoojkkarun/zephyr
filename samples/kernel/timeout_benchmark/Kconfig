@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Aerlync Labs Inc.
+
+mainmenu "Timeout Queue Benchmark"
+
+config BENCH_NUM_TIMERS
+	int "Number of timers in each benchmark phase"
+	default 64
+	range 8 1024
+	help
+		Controls N, the number of simultaneous pending timeouts exercised in
+		each benchmark phase.
+
+		Keep this value <= CONFIG_TIMEOUT_HEAP_MAX_ENTRIES when the min-heap
+		backend is selected, or the heap assert will trigger.
+
+source "Kconfig.zephyr"
