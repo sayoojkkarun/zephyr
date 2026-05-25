@@ -249,6 +249,14 @@ int net_icmpv6_send_error(struct net_pkt *orig, uint8_t type, uint8_t code,
 	net_ipv6_addr_copy_raw(orig_src.s6_addr, ip_hdr->src);
 	net_ipv6_addr_copy_raw(orig_dst.s6_addr, ip_hdr->dst);
 
+	/* RFC 4443 sect. 2.4(e.6): must not send ICMPv6 error in response to
+	 * a packet whose source does not uniquely identify a single node.
+	 */
+	if (net_ipv6_is_addr_unspecified(&orig_src) || net_ipv6_is_addr_mcast(&orig_src)) {
+		err = -EINVAL;
+		goto drop_no_pkt;
+	}
+
 	if (ip_hdr->nexthdr == NET_IPPROTO_UDP) {
 		copy_len = sizeof(struct net_ipv6_hdr) +
 			sizeof(struct net_udp_hdr);
