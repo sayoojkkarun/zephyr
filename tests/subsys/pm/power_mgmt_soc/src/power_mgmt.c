@@ -225,6 +225,11 @@ int test_pwr_mgmt_multithread(uint8_t cycles)
 {
 	uint8_t iterations = cycles;
 
+	if (residency_info_len == 0) {
+		ztest_test_skip();
+		return 0;
+	}
+
 	pm_notifier_register(&notifier);
 	create_tasks();
 
@@ -281,6 +286,11 @@ int test_pwr_mgmt_singlethread(uint8_t cycles)
 {
 	uint8_t iterations = cycles;
 
+	if (residency_info_len == 0) {
+		ztest_test_skip();
+		return 0;
+	}
+
 	LOG_INF("PM single-thread test started for cycles: %d", cycles);
 
 	pm_notifier_register(&notifier);
@@ -321,6 +331,11 @@ int test_pwr_mgmt_singlethread(uint8_t cycles)
 int test_dummy_init(void)
 {
 	uint8_t iterations = 1;
+
+	if (residency_info_len == 0) {
+		ztest_test_skip();
+		return 0;
+	}
 
 	LOG_INF("PM dummy single-thread test started for one cycle");
 
